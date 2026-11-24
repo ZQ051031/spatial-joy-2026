@@ -92,7 +92,8 @@
           return reminderReply(local(`${active.length} open; up to three shown: ${preview}.`, `${active.length}条待完成，最多列出三条：${preview}。`), action);
         }
         if (/^(?:(?:please\s+)?(?:complete|finish)\b|完成)/.test(query)) {
-          const token = query.match(/(?:reminder\s+(?:number\s+)?|提醒\s*第?)(\d+|[a-z]+|[一二三四五六七八九])(?:\b|条|$)/)?.[1];
+          const token = query.match(/reminder\s+(?:number\s+)?(\d+|[a-z]+)$/)?.[1]
+            ?? query.match(/提醒\s*第?(\d+|[一二三四五六七八九])条?$/)?.[1];
           const id = /^\d+$/.test(token) ? Number(token) : token ? Math.max(numberWords.indexOf(token), "零一二三四五六七八九".indexOf(token)) : 0;
           const action = { reminder_action: "complete" };
           if (id < 1) return reminderReply(local("Which reminder number should I complete?", "要完成哪条提醒？请说编号。"), action);
