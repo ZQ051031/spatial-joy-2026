@@ -11,7 +11,20 @@
     shuttle: /\bshuttle\b|校车/,
     exam: /\bexam(s)?\b.*\b(venue|room|location)\b|\bwhere\b.*\bexam\b|考场/
   };
-  const numberWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+  const numberWords = [
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"
+  ];
+  const tensWords = ["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+  const scaleWords = { hundred: 100, thousand: 1000, million: 1e6, billion: 1e9, trillion: 1e12 };
+  const englishNumerals = [...numberWords, ...tensWords, ...Object.keys(scaleWords)].join("|");
+  const chineseDigits = "零一二三四五六七八九";
+  const chineseNumeral = `负?[${chineseDigits}十百千]+`;
+  const numeral = `(?:-?\\d+|${chineseNumeral})`;
+  const reminderIdPattern = new RegExp(
+    `第\\s*(${numeral})(?:\\s*[条号])?|(${numeral})\\s*[条号]|(-?\\b\\d+\\b)|\\b((?:(?:minus|negative)\\s+)?(?:\\d+|${englishNumerals}))\\b`
+    + `|(?:^|提醒\\s*|[^\\p{L}\\p{N}])(${chineseNumeral})(?=$|[^\\p{L}\\p{N}])`, "gu"
+  );
 
   function languageOf(text, preferred = "en") {
     if (/[\u3400-\u9fff]/u.test(text)) return "zh";
@@ -29,10 +42,35 @@
     return text.slice(offset).trim();
   }
 
-  function reminderId(token) {
-    if (!token) return null;
-    const id = /^\d+$/.test(token) ? Number(token)
-      : Math.max(numberWords.indexOf(token), [..."零一二三四五六七八九"].indexOf(token));
+  function chineseReminderId(token) {
+    const parts = token.match(/[一二三四五六七八九][千百十]?|零|^十/g) ?? [];
+    if (parts.join("") !== token) return null;
+    let total = 0;
+    let previousScale = 10000;
+    let skipped = false;
+    for (const part of parts) {
+      if (part === "零") {
+        if (!total || skipped) return null;
+        skipped = true;
+        continue;
+      }
+      const scale = { 千: 1000, 百: 100, 十: 10 }[part.at(-1)] ?? 1;
+      if (scale >= previousScale || (total && (scale < previousScale / 10) !== skipped)) return null;
+      total += (part === "十" ? 1 : chineseDigits.indexOf(part[0])) * scale;
+      previousScale = scale;
+      skipped = false;
+    }
+    return skipped ? null : total;
+  }
+
+  function reminderId(text) {
+    const [first, second] = text.matchAll(reminderIdPattern);
+    if (!first || second) return null;
+    const token = first.slice(1).find(Boolean);
+    const tens = tensWords.indexOf(token);
+    const id = /^-?\d+$/.test(token) ? Number(token)
+      : tens >= 0 ? (tens + 2) * 10
+      : /^[a-z]+$/.test(token) ? scaleWords[token] ?? numberWords.indexOf(token) : chineseReminderId(token);
     return Number.isSafeInteger(id) && id > 0 ? id : null;
   }
 
@@ -102,8 +140,9 @@
       return respond("study_reminder", text, slots);
     }
 
-    const reminderRequest = /^(?:(?:please\s+)?(?:remind me\b|(?:list|show|complete|finish|add)\b.*\breminders?\b)|提醒我|添加提醒|查看提醒|列出提醒|完成提醒)/.test(query);
-    const followUpId = clarification?.field === "reminder_id" && reminderId(query);
+    const completionRequest = /^(?:(?:please\s+)?(?:complete|finish)\b.*\breminders?\b|(?:请(?:帮我)?)?完成提醒)/.test(query);
+    const reminderRequest = completionRequest
+      || /^(?:(?:please\s+)?(?:remind me\b|(?:list|show|add)\b.*\breminders?\b)|提醒我|添加提醒|查看提醒|列出提醒)/.test(query);
     function handleReminder() {
       try {
         if (!reminders) throw new Error("Storage unavailable");
@@ -114,10 +153,8 @@
           const preview = active.slice(0, 3).map(item => `${item.id}: ${item.task}`).join(local("; ", "；"));
           return reminderReply(local(`${active.length} open; up to three shown: ${preview}.`, `${active.length}条待完成，最多列出三条：${preview}。`), action);
         }
-        if (followUpId || (reminderRequest && /^(?:(?:please\s+)?(?:complete|finish)\b|完成)/.test(query))) {
-          const token = query.match(/reminder\s+(?:number\s+)?(\d+|[a-z]+)$/)?.[1]
-            ?? query.match(/提醒\s*第?(\d+|[一二三四五六七八九])条?$/)?.[1];
-          const id = followUpId || reminderId(token);
+        if (completionRequest || (!reminderRequest && clarification?.field === "reminder_id")) {
+          const id = reminderId(query);
           const action = { reminder_action: "complete" };
           if (!id) return askFor("reminder_id", "study_reminder", local("Which reminder number should I complete?", "要完成哪条提醒？请说编号。"), action);
           const item = reminders.complete(id);
@@ -139,7 +176,7 @@
       }
     }
 
-    if (reminderRequest || followUpId) return handleReminder();
+    if (reminderRequest) return handleReminder();
 
     for (const [topic, matcher] of Object.entries(campusTopics)) {
       if (matcher.test(query)) return sampleReply("campus_qa", sample.campus[topic][lang], { campus_topic: topic });
@@ -173,7 +210,7 @@
         : local(`No classes on ${day.en}`, `${day.zh}没有课`), slots);
     }
 
-    if (clarification?.field === "task") return handleReminder();
+    if (clarification?.field === "task" || clarification?.field === "reminder_id") return handleReminder();
 
     return respond("fallback", local("I can help with campus, classes, and study reminders. Try asking when the library closes.", "我可以帮你查校园信息、课程和学习提醒。试试问图书馆几点关门。"));
   }

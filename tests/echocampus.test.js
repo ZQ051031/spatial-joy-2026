@@ -130,10 +130,35 @@ test("an ambiguous spoken ID never completes the first matching digit", () => {
   const reminders = createReminderStore(inMemoryStorage());
   for (let id = 1; id <= 12; id++) reminders.add(`Task ${id}`);
   assert.match(route("Complete reminder one two", { reminders }).text, /Which reminder number/);
+  assert.match(route("Complete reminder one hundred", { reminders }).text, /Which reminder number/);
+  assert.match(route("Complete reminder -1 please", { reminders }).text, /Which reminder number/);
+  assert.match(route("Complete reminder minus one", { reminders }).text, /Which reminder number/);
   assert.match(route("完成提醒一二", { reminders }).text, /请说编号/);
   assert.ok(reminders.list().every(item => !item.completed));
   assert.equal(route("Complete reminder 12", { reminders }).slots.reminder_id, 12);
   assert.deepEqual(reminders.list().filter(item => item.completed).map(item => item.id), [12]);
+});
+
+test("completion accepts one bilingual ID with filler in a command or follow-up", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  for (let id = 1; id <= 12; id++) reminders.add(`Task ${id}`);
+  const { clarification } = route("Complete reminder", { reminders });
+  for (const [command, expected, pending] of [
+    ["Complete reminder 1 please", 1],
+    ["Please finish reminder number twelve, thanks", 12],
+    ["请完成提醒第十二条，谢谢", 12],
+    ["Number one", 1, clarification],
+    ["第一条", 1, clarification],
+    ["请选2号，谢谢", 2, clarification],
+    ["请选三号，谢谢", 3, clarification]
+  ]) {
+    assert.equal(route(command, { reminders, clarification: pending }).slots.reminder_id, expected, command);
+  }
+  for (const ambiguous of ["one two", "number four or five please", "第四条或5号"]) {
+    assert.equal(route(ambiguous, { reminders, clarification }).clarification?.field, "reminder_id", ambiguous);
+  }
+  assert.equal(route("When is the library open at 4?", { reminders, clarification }).intent, "campus_qa");
+  assert.deepEqual(reminders.list().filter(item => item.completed).map(item => item.id), [1, 2, 3, 12]);
 });
 
 test("missing, invalid, unknown and failed reminder writes never confirm a save", () => {
