@@ -139,6 +139,17 @@ test("an ambiguous spoken ID never completes the first matching digit", () => {
   assert.deepEqual(reminders.list().filter(item => item.completed).map(item => item.id), [12]);
 });
 
+test("Chinese conjunctions and commas separate alternative reminder IDs", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  reminders.add("Review calculus");
+  reminders.add("Read chapter 2");
+  for (const ids of ["第一条或二", "一或者二", "一和二", "一、二", "一,二"]) {
+    const result = route(`完成提醒${ids}`, { reminders });
+    assert.equal(result.clarification?.field, "reminder_id", ids);
+  }
+  assert.ok(reminders.list().every(item => !item.completed));
+});
+
 test("negated reminder-number replies ask again without completing a reminder", () => {
   const reminders = createReminderStore(inMemoryStorage());
   reminders.add("Review calculus");

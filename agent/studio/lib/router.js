@@ -23,7 +23,7 @@
   const numeral = `(?:-?\\d+|${chineseNumeral})`;
   const reminderIdPattern = new RegExp(
     `第\\s*(${numeral})(?:\\s*[条号])?|(${numeral})\\s*[条号]|(-?\\b\\d+\\b)|\\b((?:(?:minus|negative)\\s+)?(?:\\d+|${englishNumerals}))\\b`
-    + `|(?:^|提醒\\s*|[^\\p{L}\\p{N}])(${chineseNumeral})(?=$|[^\\p{L}\\p{N}])`, "gu"
+    + `|(?:^|提醒\\s*|或(?:者)?|和|[^\\p{L}\\p{N}])(${chineseNumeral})(?=$|[或和]|[^\\p{L}\\p{N}])`, "gu"
   );
 
   function languageOf(text, preferred = "en") {
