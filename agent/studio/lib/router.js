@@ -104,7 +104,7 @@
 
     const reminderRequest = /^(?:(?:please\s+)?(?:remind me\b|(?:list|show|complete|finish|add)\b.*\breminders?\b)|提醒我|添加提醒|查看提醒|列出提醒|完成提醒)/.test(query);
     const followUpId = clarification?.field === "reminder_id" && reminderId(query);
-    if (reminderRequest || followUpId || clarification?.field === "task") {
+    function handleReminder() {
       try {
         if (!reminders) throw new Error("Storage unavailable");
         if (reminderRequest && /^(?:(?:please\s+)?(?:list|show)\b|查看|列出)/.test(query)) {
@@ -139,6 +139,8 @@
       }
     }
 
+    if (reminderRequest || followUpId) return handleReminder();
+
     for (const [topic, matcher] of Object.entries(campusTopics)) {
       if (matcher.test(query)) return sampleReply("campus_qa", sample.campus[topic][lang], { campus_topic: topic });
     }
@@ -170,6 +172,8 @@
         ? local(`${day.en}: ${classes}`, `${day.zh}：${classes}`)
         : local(`No classes on ${day.en}`, `${day.zh}没有课`), slots);
     }
+
+    if (clarification?.field === "task") return handleReminder();
 
     return respond("fallback", local("I can help with campus, classes, and study reminders. Try asking when the library closes.", "我可以帮你查校园信息、课程和学习提醒。试试问图书馆几点关门。"));
   }

@@ -162,6 +162,22 @@ test("clarification replies fill the missing task, reminder ID, or study-block d
   assert.equal(reply("Find a study block", "Where is the library?").intent, "campus_qa");
 });
 
+test("a new campus or schedule question supersedes a pending reminder task", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  const { clarification } = route("Remind me", { reminders });
+  for (const [question, intent] of [
+    ["When does the library close?", "campus_qa"],
+    ["What's my Monday schedule?", "schedule_help"],
+    ["图书馆几点关门？", "campus_qa"]
+  ]) {
+    const result = route(question, { reminders, clarification });
+    assert.equal(result.intent, intent);
+    assert.equal(result.clarification, undefined);
+  }
+  assert.deepEqual(reminders.list(), []);
+  assert.equal(route("Remind me to return my library book", { reminders, clarification }).slots.task, "return my library book");
+});
+
 test("AIUI page routes a chat question and a one-turn microphone result to localized speech", () => {
   const studio = path.join(__dirname, "../agent/studio");
   assert.deepEqual(manifest.permissions, ["RECORD_AUDIO"]);
