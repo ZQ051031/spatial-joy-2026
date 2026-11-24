@@ -19,6 +19,16 @@
     return preferred === "zh" ? "zh" : "en";
   }
 
+  function originalSuffix(text, normalizedPrefixLength) {
+    let offset = 0;
+    for (const character of text) {
+      if (normalizedPrefixLength <= 0) break;
+      normalizedPrefixLength -= character.normalize("NFKC").length;
+      offset += character.length;
+    }
+    return text.slice(offset).trim();
+  }
+
   function lookupSchedule(day) {
     return sample.week.find(entry => entry.en.toLowerCase() === String(day).toLowerCase() || entry.zh === day) || null;
   }
@@ -66,8 +76,8 @@
   }
 
   function route(input, { reminders, preferredLanguage, now = new Date() } = {}) {
-    const original = String(input).trim().replace(/[.!?。！？]+$/u, "").trim();
-    const query = original.normalize("NFKC").toLowerCase();
+    const original = String(input).trim();
+    const query = original.replace(/[.!?。！？]+$/u, "").trim().normalize("NFKC").toLowerCase();
     const lang = languageOf(query, preferredLanguage);
     const local = (en, zh) => lang === "zh" ? zh : en;
     const respond = (intent, text, slots = {}) => ({ intent, lang, text, slots });
@@ -103,12 +113,14 @@
             : local(`I couldn't find reminder ${id}.`, `找不到提醒${id}。`), { ...action, reminder_id: id });
         }
 
-        const task = original.normalize("NFKC").replace(/^(?:(?:please\s+)?(?:remind me(?:\s+to\b)?|add\s+(?:a\s+)?(?:study\s+)?reminder(?:\s+to\b)?)|提醒我|添加提醒)\s*[:：]?\s*/i, "").trim();
+        const prefix = query.match(/^(?:(?:please\s+)?(?:remind me(?:\s+to\b)?|add\s+(?:a\s+)?(?:study\s+)?reminder(?:\s+to\b)?)|提醒我|添加提醒)\s*:?\s*/)?.[0] ?? "";
+        const task = query.length > prefix.length ? originalSuffix(original, prefix.length) : "";
         const action = { reminder_action: "add" };
         if (!task) return reminderReply(local("What study task should I remember?", "要记下什么学习任务？"), action);
         if (task.length > 100) return reminderReply(local("Please keep your study task under 101 characters.", "请将学习任务控制在一百字以内。"), action);
         const item = reminders.add(task);
-        return reminderReply(local(`Reminder ${item.id} saved: ${item.task}. No alarm is set.`, `提醒${item.id}已保存：${item.task}。未设置闹钟。`), { ...action, task });
+        const stop = /[.!?。！？]$/u.test(task) ? "" : local(".", "。");
+        return reminderReply(local(`Reminder ${item.id} saved: ${item.task}${stop} No alarm is set.`, `提醒${item.id}已保存：${item.task}${stop}未设置闹钟。`), { ...action, task });
       } catch {
         return reminderReply(local("Reminder storage isn't available. No changes were saved.", "提醒存储不可用，未保存任何更改。"));
       }

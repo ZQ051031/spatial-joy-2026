@@ -110,6 +110,13 @@ test("reminder commands add, list, and complete persistent study tasks", () => {
   assert.match(route("查看提醒", { reminders }).text, /没有待完成/);
 });
 
+test("reminders keep the original task text while normalizing the command", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  const task = "Solve x² + y² on page Ⅳ!";
+  assert.equal(route(`Ｒｅｍｉｎｄ ｍｅ ｔｏ： ${task}`, { reminders }).slots.task, task);
+  assert.equal(reminders.list()[0].task, task);
+});
+
 test("an ambiguous spoken ID never completes the first matching digit", () => {
   const reminders = createReminderStore(inMemoryStorage());
   for (let id = 1; id <= 12; id++) reminders.add(`Task ${id}`);
