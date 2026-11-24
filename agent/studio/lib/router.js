@@ -64,6 +64,7 @@
   }
 
   function reminderId(text) {
+    if (/\b(?:no|not|never|neither|nor)\b|n['’]t\b|不是|不要|别(?:选|完成)/.test(text)) return null;
     const [first, second] = text.matchAll(reminderIdPattern);
     if (!first || second) return null;
     const token = first.slice(1).find(Boolean);

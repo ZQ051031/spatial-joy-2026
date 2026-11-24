@@ -139,6 +139,18 @@ test("an ambiguous spoken ID never completes the first matching digit", () => {
   assert.deepEqual(reminders.list().filter(item => item.completed).map(item => item.id), [12]);
 });
 
+test("negated reminder-number replies ask again without completing a reminder", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  reminders.add("Review calculus");
+  const { clarification } = route("Complete reminder", { reminders });
+  for (const prompt of ["Not number one", "Don't pick 1", "不是第一条", "不要选第一条"]) {
+    const result = route(prompt, { reminders, clarification });
+    assert.equal(result.clarification?.field, "reminder_id", prompt);
+    assert.equal(result.slots.reminder_id, undefined, prompt);
+  }
+  assert.equal(reminders.list()[0].completed, false);
+});
+
 test("completion accepts one bilingual ID with filler in a command or follow-up", () => {
   const reminders = createReminderStore(inMemoryStorage());
   for (let id = 1; id <= 12; id++) reminders.add(`Task ${id}`);
