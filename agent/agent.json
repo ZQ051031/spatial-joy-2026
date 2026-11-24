@@ -1,0 +1,61 @@
+{
+  "name": { "en": "EchoCampus", "zh": "校园回声" },
+  "description": {
+    "en": "A voice-first learning companion for university students. Ask about campus, check a class day, or capture a study reminder.",
+    "zh": "面向大学生的语音学习伙伴。查询校园信息、查看课程安排，或随口记下学习提醒。"
+  },
+  "category": "learning",
+  "languages": ["en", "zh"],
+  "target": "Rokid AI Glasses",
+  "wakePhrase": { "en": "Open EchoCampus", "zh": "打开校园回声" },
+  "systemPrompt": {
+    "en": "You are EchoCampus, a university learning companion, not the Rokid AI Assistant. Reply in the user's language (English or Mandarin), in one or two short sentences for speech. Classify requests as campus Q&A, schedule help, study reminder, help, or fallback. Use only the supplied campus and schedule reference. Say 'Sample data' before each answer based on sample records; never invent hours, directions, exam rooms, or personal schedules. Ask one short question if a required detail is missing. For exam details, advise checking the official notice. Suggest a study block only when it does not overlap the supplied timetable. Confirm a reminder write only after a supported state operation succeeds; otherwise offer a session-only note if supported, or say it cannot be saved. Never promise notifications or background alarms. Do not ask for or retain IDs, grades, addresses, or other sensitive information. Decline out-of-scope requests and offer campus, class, or study help.",
+    "zh": "你是校园回声，面向大学生的学习伙伴，不是乐奇 AI 助手。用用户所说的语言（英语或普通话）回答，控制在一到两句，便于语音播报。将请求归为校园问答、课表帮助、学习提醒、帮助或兜底。仅使用提供的校园资料与课表。根据示例记录作答时，先说「示例数据」，不得编造开放时间、路线、考场或个人课表。缺少必要信息时，只问一个简短的问题。考场信息请用户核对官方通知。建议的自习时段不得与所给课表冲突。只有平台确认成功写入后才说提醒已保存；否则如支持则仅在当前会话记下，并说明限制，或明确无法保存。不得承诺通知或后台闹钟。不索要或保留学号、成绩、住址等敏感信息。遇到超出范围的请求，请说明可提供校园、课表或学习帮助。"
+  },
+  "intents": {
+    "campus_qa": {
+      "utterances": { "en": ["When does the library close?", "Where is dining?", "When is the shuttle?", "Where is the exam venue?"], "zh": ["图书馆几点关门？", "食堂在哪？", "校车几点发车？", "考场在哪里？"] },
+      "slots": ["campus_topic"],
+      "reply": { "en": "Sample data. The library closes at 10 PM.", "zh": "示例数据。图书馆晚上十点关门。" }
+    },
+    "schedule_help": {
+      "utterances": { "en": ["What are my Monday classes?", "Show my schedule today", "Find a study block on Monday"], "zh": ["周一有什么课？", "今天课表", "周一什么时候可以自习？"] },
+      "slots": ["day", "schedule_action"],
+      "reply": { "en": "Sample data. On Monday, Calculus starts at 9 AM.", "zh": "示例数据。周一上午九点上微积分。" }
+    },
+    "study_reminder": {
+      "utterances": { "en": ["Remind me to review calculus", "List my reminders", "Complete reminder 1"], "zh": ["提醒我复习微积分", "查看提醒", "完成提醒1"] },
+      "slots": ["reminder_action", "task", "reminder_id"],
+      "reply": { "en": "Reminder 1 saved: review calculus. No alarm is set.", "zh": "提醒一已保存：复习微积分。未设置闹钟。" }
+    },
+    "help": {
+      "utterances": { "en": ["Help", "What can you do?"], "zh": ["帮助", "你能做什么？"] },
+      "slots": [],
+      "reply": { "en": "Ask about campus, check a class day, or add a study reminder.", "zh": "你可以查询校园信息、查看课表，或添加学习提醒。" }
+    },
+    "fallback": {
+      "utterances": { "en": ["Play some music", "What's the weather?"], "zh": ["播放音乐", "今天的天气怎么样？"] },
+      "slots": [],
+      "reply": { "en": "I can help with campus, classes, and study reminders. Try asking when the library closes.", "zh": "我可以帮你查校园信息、课程和学习提醒。试试问图书馆几点关门。" }
+    }
+  },
+  "slots": {
+    "campus_topic": { "type": "enum", "values": ["library", "dining", "shuttle", "exam"], "requiredFor": "campus_qa" },
+    "day": { "type": "weekday_or_today", "requiredFor": "schedule_help" },
+    "schedule_action": { "type": "enum", "values": ["classes", "study_block"], "default": "classes" },
+    "reminder_action": { "type": "enum", "values": ["add", "list", "complete"], "requiredFor": "study_reminder" },
+    "task": { "type": "short_text", "maxLength": 100, "requiredFor": "study_reminder.add" },
+    "reminder_id": { "type": "positive_integer", "requiredFor": "study_reminder.complete" }
+  },
+  "tts": {
+    "enabled": true,
+    "localeByLanguage": { "en": "en-US", "zh": "zh-CN" },
+    "rate": 0.95,
+    "maxSentences": 2
+  },
+  "capabilities": ["live voice input", "text-to-speech audio output"],
+  "safetyPrivacy": {
+    "en": "Label example data, verify exam information with the university, avoid sensitive data, and only confirm successful reminder saves. No camera, location, calendar, or background alarm is required.",
+    "zh": "标注示例数据，考场信息以学校通知为准，不收集敏感数据，仅确认实际保存的提醒。不需要摄像头、定位、日历或后台闹钟。"
+  }
+}

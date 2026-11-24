@@ -1,0 +1,7 @@
+{
+  "pages": ["pages/index/index"],
+  "permissions": ["RECORD_AUDIO"],
+  "window": {
+    "navigationBarTitleText": "EchoCampus / 校园回声"
+  }
+}

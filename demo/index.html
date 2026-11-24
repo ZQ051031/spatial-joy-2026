@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EchoCampus · Glasses HUD demo</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="../agent/studio/lib/sample-data.js"></script>
+  <script defer src="../agent/studio/lib/router.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <span class="eyebrow"><span class="light"></span> SPATIAL JOY 2026 &nbsp;/&nbsp; LEARNING</span>
+      <span class="badge">Browser simulation</span>
+    </header>
+    <section class="lens" aria-labelledby="brand">
+      <div class="scope"><span>01 / GLASSES HUD</span><span>VOICE LINK</span></div>
+      <p class="eyebrow">YOUR CAMPUS, IN EARSHOT</p>
+      <h1 id="brand">EchoCampus <span lang="zh">校园回声</span></h1>
+      <p class="intro">Ask about campus, check a class day, or capture a study reminder.</p>
+      <div class="response" role="status" aria-live="polite">
+        <span class="eyebrow" id="intent">READY</span>
+        <p id="reply">Try “When does the library close?”</p>
+      </div>
+      <form id="ask-form">
+        <label class="sr-only" for="question">Ask EchoCampus / 向校园回声提问</label>
+        <input id="question" type="text" maxlength="200" placeholder="Ask EchoCampus / 向校园回声提问" autocomplete="off" required>
+        <button type="submit" class="primary">Ask</button>
+        <button id="mic" type="button" aria-pressed="false">Mic</button>
+      </form>
+      <div class="settings">
+        <label for="language">Mic language</label>
+        <select id="language">
+          <option value="en">English</option>
+          <option value="zh" lang="zh">普通话</option>
+        </select>
+        <label><input id="speak" type="checkbox" checked> Speak replies</label>
+      </div>
+      <p id="voice-status" class="muted" role="status">Type anytime. Mic support and permissions vary by browser.</p>
+      <div class="examples" aria-label="Example prompts">
+        <button type="button" data-prompt="When does the library close?">Library hours</button>
+        <button type="button" data-prompt="周一有什么课？" lang="zh">周一有什么课？</button>
+        <button type="button" data-prompt="Remind me to review calculus">Review calculus</button>
+      </div>
+    </section>
+    <div class="panels">
+      <section class="panel">
+        <h2>Weekly schedule</h2>
+        <p class="eyebrow">SAMPLE DATA / 示例数据</p>
+        <ul id="schedule" class="schedule"></ul>
+      </section>
+      <section class="panel">
+        <h2>Study reminders</h2>
+        <p class="muted">Saved in this browser if storage is available. No alarms. Use a sample task, not personal data.</p>
+        <form id="reminder-form">
+          <label class="sr-only" for="task">Study task</label>
+          <input id="task" type="text" maxlength="100" placeholder="Study task" required>
+          <button type="submit">Add</button>
+        </form>
+        <ul id="reminders"></ul>
+      </section>
+    </div>
+    <section class="panel transcript">
+      <h2>Session transcript</h2>
+      <ol id="transcript"></ol>
+      <p id="transcript-empty" class="muted">No turns yet. The transcript is not saved by this demo.</p>
+    </section>
+  </main>
+</body>
+</html>
