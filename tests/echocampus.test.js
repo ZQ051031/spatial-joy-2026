@@ -96,6 +96,15 @@ test("study block avoids scheduled Monday classes", () => {
   assert.match(route("周一什么时候可以自习？").text, /示例数据。周一可以在10:00到10:30自习/);
 });
 
+test("today's study block starts at or after now and avoids classes", () => {
+  const onMonday = (hour, minute, second = 0) => ({ now: new Date(2027, 0, 4, hour, minute, second) });
+  assert.match(route("Find a study block today", onMonday(8, 5)).text, /10:00 to 10:30/);
+  assert.match(route("Find a study block today", onMonday(13, 10)).text, /14:30 to 15:00/);
+  assert.match(route("Find a study block today", onMonday(15, 5, 20)).text, /15:06 to 15:36/);
+  assert.match(route("今天什么时候可以自习？", onMonday(16, 30)).text, /16:30到17:00/);
+  assert.match(route("Find a study block today", onMonday(16, 30, 1)).text, /No open 30-minute study block/);
+});
+
 test("reminder commands add, list, and complete persistent study tasks", () => {
   const storage = inMemoryStorage();
   const reminders = createReminderStore(storage);

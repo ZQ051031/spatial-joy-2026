@@ -40,13 +40,15 @@
     return sample.week.find(entry => entry.en.toLowerCase() === String(day).toLowerCase() || entry.zh === day) || null;
   }
 
-  function studyBlock(classes) {
+  function studyBlock(classes, earliestMinute) {
     const mins = time => {
       const [h, m] = time.split(":").map(Number);
       return h * 60 + m;
     };
     const clock = time => [Math.floor(time / 60), time % 60].map(n => String(n).padStart(2, "0")).join(":");
-    for (let start = 9 * 60; start + 30 <= 17 * 60; start += 30) {
+    const opening = 9 * 60;
+    const step = earliestMinute === undefined ? 30 : 1;
+    for (let start = Math.max(opening, earliestMinute ?? opening); start + 30 <= 17 * 60; start += step) {
       if (!classes.some(item => start < mins(item.end) && start + 30 > mins(item.start))) {
         return [clock(start), clock(start + 30)];
       }
@@ -147,12 +149,16 @@
         || (query === dayName && clarification?.field === "day" && clarification.schedule_action === "study_block");
       const action = { schedule_action: study ? "study_block" : "classes" };
       if (!dayName) return askFor("day", "schedule_help", local("Which day should I check?", "要查哪一天？"), action);
-      const day = /^(today|今天)$/.test(dayName)
+      const today = /^(today|今天)$/.test(dayName);
+      const day = today
         ? sample.week[(now.getDay() + 6) % 7]
         : lookupSchedule(dayName.replace("星期", "周").replace("周天", "周日"));
       const slots = { ...action, day: day.en };
       if (study) {
-        const block = studyBlock(day.classes);
+        const earliestMinute = today
+          ? now.getHours() * 60 + now.getMinutes() + Number(now.getSeconds() > 0 || now.getMilliseconds() > 0)
+          : undefined;
+        const block = studyBlock(day.classes, earliestMinute);
         const answer = block
           ? local(`Try studying on ${day.en} from ${block[0]} to ${block[1]}`, `${day.zh}可以在${block[0]}到${block[1]}自习`)
           : local(`No open 30-minute study block on ${day.en}`, `${day.zh}没有可用的三十分钟自习时段`);
