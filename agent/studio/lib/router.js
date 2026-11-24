@@ -132,10 +132,8 @@
     const askFor = (field, intent, text, slots) =>
       ({ ...respond(intent, text, slots), clarification: { field, lang, ...slots } });
     const sampleReply = (intent, answer, slots) => respond(intent, local(`Sample data. ${answer}.`, `示例数据。${answer}。`), slots);
-
-    if (/^(help|what can you do|open echocampus|帮助|你能做什么|打开校园回声)$/.test(query)) {
-      return respond("help", local("Ask about campus, check a class day, or add a study reminder.", "你可以查询校园信息、查看课表，或添加学习提醒。"));
-    }
+    const taskReply = clarification?.field === "task" && !(/[?？]$/.test(original)
+      || /^(?:who|whom|whose|what|when|where|which|why|how|can|is|does)\b|吗|什么|几点|哪|怎么|多少/.test(query));
 
     function reminderReply(text, slots) {
       return respond("study_reminder", text, slots);
@@ -147,14 +145,14 @@
     function handleReminder() {
       try {
         if (!reminders) throw new Error("Storage unavailable");
-        if (reminderRequest && /^(?:(?:please\s+)?(?:list|show)\b|查看|列出)/.test(query)) {
+        if (!taskReply && reminderRequest && /^(?:(?:please\s+)?(?:list|show)\b|查看|列出)/.test(query)) {
           const active = reminders.list().filter(item => !item.completed);
           const action = { reminder_action: "list" };
           if (!active.length) return reminderReply(local("No open study reminders.", "没有待完成的学习提醒。"), action);
           const preview = active.slice(0, 3).map(item => `${item.id}: ${item.task}`).join(local("; ", "；"));
           return reminderReply(local(`${active.length} open; up to three shown: ${preview}.`, `${active.length}条待完成，最多列出三条：${preview}。`), action);
         }
-        if (completionRequest || (!reminderRequest && clarification?.field === "reminder_id")) {
+        if (!taskReply && (completionRequest || (!reminderRequest && clarification?.field === "reminder_id"))) {
           const id = reminderId(query);
           const action = { reminder_action: "complete" };
           if (!id) return askFor("reminder_id", "study_reminder", local("Which reminder number should I complete?", "要完成哪条提醒？请说编号。"), action);
@@ -177,7 +175,11 @@
       }
     }
 
-    if (reminderRequest) return handleReminder();
+    if (taskReply || reminderRequest) return handleReminder();
+
+    if (/^(help|what can you do|open echocampus|帮助|你能做什么|打开校园回声)$/.test(query)) {
+      return respond("help", local("Ask about campus, check a class day, or add a study reminder.", "你可以查询校园信息、查看课表，或添加学习提醒。"));
+    }
 
     for (const [topic, matcher] of Object.entries(campusTopics)) {
       if (matcher.test(query)) return sampleReply("campus_qa", sample.campus[topic][lang], { campus_topic: topic });
@@ -211,7 +213,7 @@
         : local(`No classes on ${day.en}`, `${day.zh}没有课`), slots);
     }
 
-    if (clarification?.field === "task" || clarification?.field === "reminder_id") return handleReminder();
+    if (clarification?.field === "reminder_id") return handleReminder();
 
     return respond("fallback", local("I can help with campus, classes, and study reminders. Try asking when the library closes.", "我可以帮你查校园信息、课程和学习提醒。试试问图书馆几点关门。"));
   }
