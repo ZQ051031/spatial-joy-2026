@@ -216,6 +216,9 @@ test("a new campus or schedule question supersedes a pending reminder task", () 
   for (const [question, intent] of [
     ["When does the library close?", "campus_qa"],
     ["What's my Monday schedule?", "schedule_help"],
+    ["Do I have classes on Monday?", "schedule_help"],
+    ["Do I have classes on Monday", "schedule_help"],
+    ["Are Monday classes in the sample schedule", "schedule_help"],
     ["图书馆几点关门？", "campus_qa"],
     ["How late is the library open", "campus_qa"],
     ["Library hours?", "campus_qa"],
@@ -231,7 +234,7 @@ test("a new campus or schedule question supersedes a pending reminder task", () 
 
 test("a pending reminder task keeps non-question replies with campus or schedule keywords", () => {
   const reminders = createReminderStore(inMemoryStorage());
-  const tasks = ["Return my library book", "Review Monday class notes", "把书还给图书馆", "Complete reminder 1"];
+  const tasks = ["Return my library book", "Review Monday class notes", "把书还给图书馆"];
   const { clarification } = route("Remind me", { reminders });
   for (const task of tasks) {
     const result = route(task, { reminders, clarification });
@@ -242,10 +245,24 @@ test("a pending reminder task keeps non-question replies with campus or schedule
   assert.ok(reminders.list().every(item => !item.completed));
 });
 
-test("a task verb takes priority over question wording in a pending reminder task", () => {
+test("explicit reminder completion commands take priority over a pending task and question punctuation", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  const { clarification } = route("Remind me", { reminders });
+  const commands = ["Finish reminder 1?", "Complete reminder 2", "Done with reminder 3?", "完成提醒第四条？"];
+  for (const [index, command] of commands.entries()) {
+    reminders.add(`Read chapter ${index + 1}`);
+    const result = route(command, { reminders, clarification });
+    assert.deepEqual(result.slots, { reminder_action: "complete", reminder_id: index + 1 }, command);
+    assert.equal(result.clarification, undefined);
+  }
+  assert.equal(reminders.list().length, commands.length);
+  assert.ok(reminders.list().every(item => item.completed));
+});
+
+test("a task verb takes priority over embedded Chinese question words in a pending reminder task", () => {
   const reminders = createReminderStore(inMemoryStorage());
   const { clarification } = route("提醒我", { reminders });
-  const tasks = ["复习怎么解方程", "练习怎么去图书馆", "Study how to solve equations?"];
+  const tasks = ["复习怎么解方程", "练习怎么去图书馆", "Study how to solve equations"];
   for (const task of tasks) {
     const result = route(task, { reminders, clarification });
     assert.equal(result.slots.task, task);
@@ -261,6 +278,7 @@ test("an unmatched question re-asks for the pending task without saving it", () 
   const result = route("What's the weather?", { reminders, clarification });
   assert.equal(result.text, "What study task should I remember?");
   assert.deepEqual(result.clarification, clarification);
+  assert.deepEqual(route("Study how to solve equations?", { reminders, clarification }).clarification, clarification);
   assert.deepEqual(reminders.list(), []);
   assert.equal(route("Read chapter 3", { reminders, clarification: result.clarification }).slots.task, "Read chapter 3");
 });

@@ -135,31 +135,32 @@
     const askForTask = () =>
       askFor("task", "study_reminder", local("What study task should I remember?", "要记下什么学习任务？"), addAction);
     const sampleReply = (intent, answer, slots) => respond(intent, local(`Sample data. ${answer}.`, `示例数据。${answer}。`), slots);
+    const completionRequest = /^(?:(?:please\s+)?(?:complete|finish|done)\b.*\breminders?\b|(?:请(?:帮我)?)?完成提醒)/.test(query);
+    const reminderRequest = completionRequest
+      || /^(?:(?:please\s+)?(?:remind me\b|(?:list|show|add)\b.*\breminders?\b)|提醒我|添加提醒|查看提醒|列出提醒)/.test(query);
     const pendingTask = clarification?.field === "task";
-    const taskReply = pendingTask && (
+    const directQuestion = /[?？]$/.test(original)
+      || /^(?:do|does|is|are|can|who|whom|whose|what|when|where|which|why|how)\b/.test(query);
+    const taskReply = pendingTask && !reminderRequest && !directQuestion && (
       /^(?:(?:review|read|finish|study|practice|submit|return|prepare|write|do)\b|复习|预习|背|读|看|完成|写|做|练习|交|还|准备)/.test(query)
-      || !(/[?？]$/.test(original)
-        || /^(?:who|whom|whose|what|when|where|which|why|how|can|is|does)\b|吗|什么|几点|哪|怎么|多少/.test(query))
+      || !/吗|什么|几点|哪|怎么|多少/.test(query)
     );
 
     function reminderReply(text, slots) {
       return respond("study_reminder", text, slots);
     }
 
-    const completionRequest = /^(?:(?:please\s+)?(?:complete|finish)\b.*\breminders?\b|(?:请(?:帮我)?)?完成提醒)/.test(query);
-    const reminderRequest = completionRequest
-      || /^(?:(?:please\s+)?(?:remind me\b|(?:list|show|add)\b.*\breminders?\b)|提醒我|添加提醒|查看提醒|列出提醒)/.test(query);
     function handleReminder() {
       try {
         if (!reminders) throw new Error("Storage unavailable");
-        if (!taskReply && reminderRequest && /^(?:(?:please\s+)?(?:list|show)\b|查看|列出)/.test(query)) {
+        if (reminderRequest && /^(?:(?:please\s+)?(?:list|show)\b|查看|列出)/.test(query)) {
           const active = reminders.list().filter(item => !item.completed);
           const action = { reminder_action: "list" };
           if (!active.length) return reminderReply(local("No open study reminders.", "没有待完成的学习提醒。"), action);
           const preview = active.slice(0, 3).map(item => `${item.id}: ${item.task}`).join(local("; ", "；"));
           return reminderReply(local(`${active.length} open; up to three shown: ${preview}.`, `${active.length}条待完成，最多列出三条：${preview}。`), action);
         }
-        if (!taskReply && (completionRequest || (!reminderRequest && clarification?.field === "reminder_id"))) {
+        if (completionRequest || (!reminderRequest && clarification?.field === "reminder_id")) {
           const id = reminderId(query);
           const action = { reminder_action: "complete" };
           if (!id) return askFor("reminder_id", "study_reminder", local("Which reminder number should I complete?", "要完成哪条提醒？请说编号。"), action);
