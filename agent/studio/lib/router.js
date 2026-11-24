@@ -29,6 +29,13 @@
     return text.slice(offset).trim();
   }
 
+  function reminderId(token) {
+    if (!token) return null;
+    const id = /^\d+$/.test(token) ? Number(token)
+      : Math.max(numberWords.indexOf(token), [..."零一二三四五六七八九"].indexOf(token));
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  }
+
   function lookupSchedule(day) {
     return sample.week.find(entry => entry.en.toLowerCase() === String(day).toLowerCase() || entry.zh === day) || null;
   }
@@ -75,12 +82,14 @@
     };
   }
 
-  function route(input, { reminders, preferredLanguage, now = new Date() } = {}) {
+  function route(input, { reminders, preferredLanguage, now = new Date(), clarification } = {}) {
     const original = String(input).trim();
     const query = original.replace(/[.!?。！？]+$/u, "").trim().normalize("NFKC").toLowerCase();
-    const lang = languageOf(query, preferredLanguage);
+    const lang = languageOf(query, clarification?.lang ?? preferredLanguage);
     const local = (en, zh) => lang === "zh" ? zh : en;
     const respond = (intent, text, slots = {}) => ({ intent, lang, text, slots });
+    const askFor = (field, intent, text, slots) =>
+      ({ ...respond(intent, text, slots), clarification: { field, lang, ...slots } });
     const sampleReply = (intent, answer, slots) => respond(intent, local(`Sample data. ${answer}.`, `示例数据。${answer}。`), slots);
 
     if (/^(help|what can you do|open echocampus|帮助|你能做什么|打开校园回声)$/.test(query)) {
@@ -91,22 +100,24 @@
       return respond("study_reminder", text, slots);
     }
 
-    if (/^(?:(?:please\s+)?(?:remind me\b|(?:list|show|complete|finish|add)\b.*\breminders?\b)|提醒我|添加提醒|查看提醒|列出提醒|完成提醒)/.test(query)) {
+    const reminderRequest = /^(?:(?:please\s+)?(?:remind me\b|(?:list|show|complete|finish|add)\b.*\breminders?\b)|提醒我|添加提醒|查看提醒|列出提醒|完成提醒)/.test(query);
+    const followUpId = clarification?.field === "reminder_id" && reminderId(query);
+    if (reminderRequest || followUpId || clarification?.field === "task") {
       try {
         if (!reminders) throw new Error("Storage unavailable");
-        if (/^(?:(?:please\s+)?(?:list|show)\b|查看|列出)/.test(query)) {
+        if (reminderRequest && /^(?:(?:please\s+)?(?:list|show)\b|查看|列出)/.test(query)) {
           const active = reminders.list().filter(item => !item.completed);
           const action = { reminder_action: "list" };
           if (!active.length) return reminderReply(local("No open study reminders.", "没有待完成的学习提醒。"), action);
           const preview = active.slice(0, 3).map(item => `${item.id}: ${item.task}`).join(local("; ", "；"));
           return reminderReply(local(`${active.length} open; up to three shown: ${preview}.`, `${active.length}条待完成，最多列出三条：${preview}。`), action);
         }
-        if (/^(?:(?:please\s+)?(?:complete|finish)\b|完成)/.test(query)) {
+        if (followUpId || (reminderRequest && /^(?:(?:please\s+)?(?:complete|finish)\b|完成)/.test(query))) {
           const token = query.match(/reminder\s+(?:number\s+)?(\d+|[a-z]+)$/)?.[1]
             ?? query.match(/提醒\s*第?(\d+|[一二三四五六七八九])条?$/)?.[1];
-          const id = /^\d+$/.test(token) ? Number(token) : token ? Math.max(numberWords.indexOf(token), "零一二三四五六七八九".indexOf(token)) : 0;
+          const id = followUpId || reminderId(token);
           const action = { reminder_action: "complete" };
-          if (id < 1) return reminderReply(local("Which reminder number should I complete?", "要完成哪条提醒？请说编号。"), action);
+          if (!id) return askFor("reminder_id", "study_reminder", local("Which reminder number should I complete?", "要完成哪条提醒？请说编号。"), action);
           const item = reminders.complete(id);
           return reminderReply(item
             ? local(`Reminder ${id} is complete.`, `提醒${id}已完成。`)
@@ -116,7 +127,7 @@
         const prefix = query.match(/^(?:(?:please\s+)?(?:remind me(?:\s+to\b)?|add\s+(?:a\s+)?(?:study\s+)?reminder(?:\s+to\b)?)|提醒我|添加提醒)\s*:?\s*/)?.[0] ?? "";
         const task = query.length > prefix.length ? originalSuffix(original, prefix.length) : "";
         const action = { reminder_action: "add" };
-        if (!task) return reminderReply(local("What study task should I remember?", "要记下什么学习任务？"), action);
+        if (!task) return askFor("task", "study_reminder", local("What study task should I remember?", "要记下什么学习任务？"), action);
         if (task.length > 100) return reminderReply(local("Please keep your study task under 101 characters.", "请将学习任务控制在一百字以内。"), action);
         const item = reminders.add(task);
         const stop = /[.!?。！？]$/u.test(task) ? "" : local(".", "。");
@@ -132,9 +143,10 @@
 
     const dayName = query.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today)\b|(?:周|星期)[一二三四五六日天]|今天/)?.[0];
     if (query === dayName || /\b(?:classes|class|schedule|timetable|study block)\b|课表|上课|有.*课|自习/.test(query)) {
-      const study = /\bstudy block\b|自习/.test(query);
+      const study = /\bstudy block\b|自习/.test(query)
+        || (query === dayName && clarification?.field === "day" && clarification.schedule_action === "study_block");
       const action = { schedule_action: study ? "study_block" : "classes" };
-      if (!dayName) return respond("schedule_help", local("Which day should I check?", "要查哪一天？"), action);
+      if (!dayName) return askFor("day", "schedule_help", local("Which day should I check?", "要查哪一天？"), action);
       const day = /^(today|今天)$/.test(dayName)
         ? sample.week[(now.getDay() + 6) % 7]
         : lookupSchedule(dayName.replace("星期", "周").replace("周天", "周日"));

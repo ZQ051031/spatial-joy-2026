@@ -138,6 +138,21 @@ test("missing, invalid, unknown and failed reminder writes never confirm a save"
   assert.match(route("Remind me to review physics", { reminders: broken }).text, /No changes were saved/);
 });
 
+test("clarification replies fill the missing task, reminder ID, or study-block day", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  reminders.add("Read chapter 2");
+  const reply = (request, followUp) => {
+    const { clarification } = route(request, { reminders });
+    return route(followUp, { reminders, clarification });
+  };
+
+  assert.equal(reply("Remind me", "read chapter 3").slots.task, "read chapter 3");
+  assert.match(reply("完成提醒", "2").text, /提醒2已完成/);
+  assert.ok(reminders.list()[1].completed);
+  assert.deepEqual(reply("Find a study block", "Friday").slots, { schedule_action: "study_block", day: "Friday" });
+  assert.equal(reply("Find a study block", "Where is the library?").intent, "campus_qa");
+});
+
 test("AIUI page routes a chat question and a one-turn microphone result to localized speech", () => {
   const studio = path.join(__dirname, "../agent/studio");
   assert.deepEqual(manifest.permissions, ["RECORD_AUDIO"]);

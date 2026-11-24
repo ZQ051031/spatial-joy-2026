@@ -13,6 +13,7 @@ const taskInput = byId("task");
 const synth = globalThis.speechSynthesis;
 const locale = { en: "en-US", zh: "zh-CN" };
 let reminders;
+let clarification;
 try {
   reminders = createReminderStore(globalThis.localStorage);
 } catch {
@@ -86,8 +87,9 @@ function speak(result) {
   synth.speak(audio);
 }
 
-function submit(input) {
-  const result = route(input, { reminders, preferredLanguage: language.value });
+function submit(input, followUp = false) {
+  const result = route(input, { reminders, preferredLanguage: language.value, clarification: followUp ? clarification : undefined });
+  clarification = result.clarification;
   byId("intent").textContent = result.intent.replaceAll("_", " ").toUpperCase();
   const reply = byId("reply");
   reply.lang = result.lang;
@@ -109,7 +111,7 @@ function submit(input) {
 byId("ask-form").addEventListener("submit", event => {
   event.preventDefault();
   if (!question.value.trim()) return;
-  submit(question.value.trim());
+  submit(question.value.trim(), true);
   question.value = "";
 });
 
@@ -154,7 +156,7 @@ if (SpeechRecognition) {
     recognition.onresult = event => {
       const heard = event.results[0][0].transcript.trim();
       voiceStatus.textContent = "Speech received. You can also type a question.";
-      if (heard) submit(heard);
+      if (heard) submit(heard, true);
     };
     recognition.onerror = () => {
       voiceStatus.textContent = "Mic input failed or was blocked. Type your question instead.";
