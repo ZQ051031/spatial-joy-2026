@@ -131,9 +131,16 @@
     const respond = (intent, text, slots = {}) => ({ intent, lang, text, slots });
     const askFor = (field, intent, text, slots) =>
       ({ ...respond(intent, text, slots), clarification: { field, lang, ...slots } });
+    const addAction = { reminder_action: "add" };
+    const askForTask = () =>
+      askFor("task", "study_reminder", local("What study task should I remember?", "要记下什么学习任务？"), addAction);
     const sampleReply = (intent, answer, slots) => respond(intent, local(`Sample data. ${answer}.`, `示例数据。${answer}。`), slots);
-    const taskReply = clarification?.field === "task" && !(/[?？]$/.test(original)
-      || /^(?:who|whom|whose|what|when|where|which|why|how|can|is|does)\b|吗|什么|几点|哪|怎么|多少/.test(query));
+    const pendingTask = clarification?.field === "task";
+    const taskReply = pendingTask && (
+      /^(?:(?:review|read|finish|study|practice|submit|return|prepare|write|do)\b|复习|预习|背|读|看|完成|写|做|练习|交|还|准备)/.test(query)
+      || !(/[?？]$/.test(original)
+        || /^(?:who|whom|whose|what|when|where|which|why|how|can|is|does)\b|吗|什么|几点|哪|怎么|多少/.test(query))
+    );
 
     function reminderReply(text, slots) {
       return respond("study_reminder", text, slots);
@@ -164,12 +171,11 @@
 
         const prefix = query.match(/^(?:(?:please\s+)?(?:remind me(?:\s+to\b)?|add\s+(?:a\s+)?(?:study\s+)?reminder(?:\s+to\b)?)|提醒我|添加提醒)\s*:?\s*/)?.[0] ?? "";
         const task = query.length > prefix.length ? originalSuffix(original, prefix.length) : "";
-        const action = { reminder_action: "add" };
-        if (!task) return askFor("task", "study_reminder", local("What study task should I remember?", "要记下什么学习任务？"), action);
-        if (task.length > 100) return reminderReply(local("Please keep your study task under 101 characters.", "请将学习任务控制在一百字以内。"), action);
+        if (!task) return askForTask();
+        if (task.length > 100) return reminderReply(local("Please keep your study task under 101 characters.", "请将学习任务控制在一百字以内。"), addAction);
         const item = reminders.add(task);
         const stop = /[.!?。！？]$/u.test(task) ? "" : local(".", "。");
-        return reminderReply(local(`Reminder ${item.id} saved: ${item.task}${stop} No alarm is set.`, `提醒${item.id}已保存：${item.task}${stop}未设置闹钟。`), { ...action, task });
+        return reminderReply(local(`Reminder ${item.id} saved: ${item.task}${stop} No alarm is set.`, `提醒${item.id}已保存：${item.task}${stop}未设置闹钟。`), { ...addAction, task });
       } catch {
         return reminderReply(local("Reminder storage isn't available. No changes were saved.", "提醒存储不可用，未保存任何更改。"));
       }
@@ -214,6 +220,7 @@
     }
 
     if (clarification?.field === "reminder_id") return handleReminder();
+    if (pendingTask) return askForTask();
 
     return respond("fallback", local("I can help with campus, classes, and study reminders. Try asking when the library closes.", "我可以帮你查校园信息、课程和学习提醒。试试问图书馆几点关门。"));
   }

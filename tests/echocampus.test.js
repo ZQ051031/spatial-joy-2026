@@ -219,8 +219,7 @@ test("a new campus or schedule question supersedes a pending reminder task", () 
     ["图书馆几点关门？", "campus_qa"],
     ["How late is the library open", "campus_qa"],
     ["Library hours?", "campus_qa"],
-    ["图书馆几点关门", "campus_qa"],
-    ["What's the weather?", "fallback"]
+    ["图书馆几点关门", "campus_qa"]
   ]) {
     const result = route(question, { reminders, clarification });
     assert.equal(result.intent, intent);
@@ -241,6 +240,29 @@ test("a pending reminder task keeps non-question replies with campus or schedule
   }
   assert.deepEqual(reminders.list().map(item => item.task), tasks);
   assert.ok(reminders.list().every(item => !item.completed));
+});
+
+test("a task verb takes priority over question wording in a pending reminder task", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  const { clarification } = route("提醒我", { reminders });
+  const tasks = ["复习怎么解方程", "练习怎么去图书馆", "Study how to solve equations?"];
+  for (const task of tasks) {
+    const result = route(task, { reminders, clarification });
+    assert.equal(result.slots.task, task);
+    assert.equal(result.clarification, undefined);
+  }
+  assert.deepEqual(reminders.list().map(item => item.task), tasks);
+});
+
+test("an unmatched question re-asks for the pending task without saving it", () => {
+  const reminders = createReminderStore(inMemoryStorage());
+  const { clarification } = route("Remind me", { reminders });
+  assert.equal(route("What's the weather?", { reminders }).intent, "fallback");
+  const result = route("What's the weather?", { reminders, clarification });
+  assert.equal(result.text, "What study task should I remember?");
+  assert.deepEqual(result.clarification, clarification);
+  assert.deepEqual(reminders.list(), []);
+  assert.equal(route("Read chapter 3", { reminders, clarification: result.clarification }).slots.task, "Read chapter 3");
 });
 
 test("AIUI page routes a chat question and a one-turn microphone result to localized speech", () => {
